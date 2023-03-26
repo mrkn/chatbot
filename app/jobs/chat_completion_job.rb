@@ -1,10 +1,8 @@
-require "sidekiq"
+require "slack_bot/utils"
 require "utils"
 
-require "slack_bot/utils"
-
-class ChatGPTJob
-  include Sidekiq::Job
+class ChatCompletionJob < ApplicationJob
+  queue_as :default
 
   DEFAULT_PROMPT = <<~END_PROMPT
   You are ChatGPT, a large language model trained by OpenAI.
