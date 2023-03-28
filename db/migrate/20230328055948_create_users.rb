@@ -5,6 +5,7 @@ class CreateUsers < ActiveRecord::Migration[7.0]
       t.string :name
       t.string :real_name
       t.string :email
+      t.string :locale, null: false
       t.integer :tz_offset
 
       t.timestamps
