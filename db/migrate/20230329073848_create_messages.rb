@@ -3,9 +3,9 @@ class CreateMessages < ActiveRecord::Migration[7.0]
     create_table :messages do |t|
       t.references :conversation, null: false, foreign_key: true
       t.references :user, null: false, foreign_key: true
-      t.string :text
-      t.string :slack_ts
-      t.string :slack_thread_ts
+      t.string :text, null: false
+      t.string :slack_ts, null: false
+      t.string :slack_thread_ts, null: false
 
       t.timestamps
     end
