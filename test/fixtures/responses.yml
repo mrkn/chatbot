@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  query: one
+  text: MyString
+  n_query_tokens: 1
+  n_response_tokens: 1
+  body: 
+  good: false
+
+two:
+  query: two
+  text: MyString
+  n_query_tokens: 1
+  n_response_tokens: 1
+  body: 
+  good: false
