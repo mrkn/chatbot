@@ -20,6 +20,9 @@ class ActiveSupport::TestCase
     users
     conversations
     memberships
+    messages
+    queries
+    responses
   )
 
   # Add more helper methods to be used by all tests here...

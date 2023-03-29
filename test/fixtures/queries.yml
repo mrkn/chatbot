@@ -3,9 +3,9 @@
 one:
   message: one
   text: MyString
-  body: 
+  body: {}
 
 two:
   message: two
   text: MyString
-  body: 
+  body: {}

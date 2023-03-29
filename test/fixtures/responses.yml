@@ -5,7 +5,7 @@ one:
   text: MyString
   n_query_tokens: 1
   n_response_tokens: 1
-  body: 
+  body: {}
   good: false
 
 two:
@@ -13,5 +13,5 @@ two:
   text: MyString
   n_query_tokens: 1
   n_response_tokens: 1
-  body: 
+  body: {}
   good: false

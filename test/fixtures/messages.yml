@@ -1,15 +1,15 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
 one:
-  conversation: one
+  conversation: random
   user: one
   text: MyString
-  slack_ts: MyString
-  slack_thread_ts: MyString
+  slack_ts: 1680132278.1370368
+  slack_thread_ts: 1680132278.1370368
 
 two:
-  conversation: two
+  conversation: random
   user: two
   text: MyString
-  slack_ts: MyString
-  slack_thread_ts: MyString
+  slack_ts: 1680132294.789146
+  slack_thread_ts: 1680132294.789146
