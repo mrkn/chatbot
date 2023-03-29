@@ -27,7 +27,15 @@ class ActiveSupport::TestCase
   module SlackTestHelper
     def decode_slack_client_request_body(request_body)
       body = URI.decode_www_form(request_body).to_h
-      body.transform_values {|value| JSON.load(value) rescue value }
+      body.map { |key, value|
+        value = case key
+                when "ts", "thread_ts"
+                  value
+                else
+                  JSON.load(value) rescue value
+                end
+        [key, value]
+      }.to_h
     end
 
     def api_usage_block(prompt_tokens, completion_tokens, model)

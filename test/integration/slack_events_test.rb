@@ -6,12 +6,13 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
   include SlackTestHelper
 
   test "app_mention event from known user in known channel" do
-    channel_id = conversations(:random).slack_id
-    user_id = users(:one).slack_id
+    slack_ts = Time.now.to_f.to_s
+    channel = conversations(:random)
+    user = users(:one)
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
     answer = "ABC"
-    expected_response = "<@#{user_id}> #{answer}"
+    expected_response = "<@#{user.slack_id}> #{answer}"
 
     stub(Utils).chat_completion({
       role: "user",
@@ -36,18 +37,21 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
     stub_request(:post, "https://slack.com/api/chat.postMessage")
 
+    assert Message.find_by(conversation: channel, user: user, slack_ts: slack_ts).blank?
+
     assert_enqueued_with(job: ChatCompletionJob) do
-      timestamp = Time.now.to_i
       params = {
         type: "event_callback",
         event: {
           type: "app_mention",
           text: query,
-          channel: channel_id,
-          user: user_id
+          channel: channel.slack_id,
+          user: user.slack_id,
+          ts: slack_ts
         }
       }
       request_body = ActionDispatch::RequestEncoder.encoder(:json).encode_params(params)
+      timestamp = slack_ts.to_i
       headers = {
         "X-Slack-Request-Timestamp": timestamp,
         "X-Slack-Signature": compute_request_signature(timestamp, request_body)
@@ -55,6 +59,16 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
       post "/slack/events", params:, headers:, as: :json
     end
+
+    message = Message.find_by!(conversation: channel, user: user, slack_ts: slack_ts)
+    assert_equal([
+                   query,
+                   slack_ts,
+                 ],
+                 [
+                   message.text,
+                   message.slack_thread_ts,
+                 ])
 
     perform_enqueued_jobs
 
@@ -72,8 +86,9 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
     assert_equal(
       {
-        "channel" => channel_id,
+        "channel" => channel.slack_id,
         "text" => expected_response,
+        "thread_ts" => slack_ts,
         "blocks" => [
           {
             "type" => "section",
@@ -92,6 +107,7 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
 
   test "app_mention event from unknown user in unknown channel" do
+    slack_ts = Time.now.to_f.to_s
     channel_id = "CUQF0FE2V"
     user_id = "U039NG1FNJE"
     query_body = "ZZZ"
@@ -163,10 +179,12 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
           type: "app_mention",
           text: query,
           channel: channel_id,
-          user: user_id
+          user: user_id,
+          ts: slack_ts
         }
       }
       request_body = ActionDispatch::RequestEncoder.encoder(:json).encode_params(params)
+      timestamp = slack_ts.to_i
       headers = {
         "X-Slack-Request-Timestamp": timestamp,
         "X-Slack-Signature": compute_request_signature(timestamp, request_body)
@@ -193,23 +211,24 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
 
   test "app_mention event with invalid signature" do
+    slack_ts = Time.now.to_f.to_s
     channel_id = conversations(:random).slack_id
     user_id = users(:one).slack_id
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
 
-    timestamp = Time.now.to_i
     params = {
       type: "event_callback",
       event: {
         type: "app_mention",
         text: query,
         channel: channel_id,
-        user: user_id
+        user: user_id,
+        ts: slack_ts
       }
     }
     headers = {
-      "X-Slack-Request-Timestamp": timestamp,
+      "X-Slack-Request-Timestamp": slack_ts.to_i,
       "X-Slack-Signature": "invalid signature"
     }
 
@@ -220,22 +239,24 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
 
   test "app_mention event when SLACK_SIGNING_SECRET is not given" do
+    slack_ts = Time.now.to_f.to_s
     channel_id = conversations(:random).slack_id
     user_id = users(:one).slack_id
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
 
-    timestamp = Time.now.to_i
     params = {
       type: "event_callback",
       event: {
         type: "app_mention",
         text: query,
         channel: channel_id,
-        user: user_id
+        user: user_id,
+        ts: slack_ts
       }
     }
     request_body = ActionDispatch::RequestEncoder.encoder(:json).encode_params(params)
+    timestamp = slack_ts.to_i
     headers = {
       "X-Slack-Request-Timestamp": timestamp,
       "X-Slack-Signature": compute_request_signature(timestamp, request_body)

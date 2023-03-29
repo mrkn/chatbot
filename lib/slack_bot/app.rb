@@ -107,11 +107,11 @@ module SlackBot
           user = ensure_user(event["user"], channel)
           ts = event["ts"]
           thread_ts = event["thread_ts"]
-          message = event["text"]
+          text = event["text"]
 
           if allowed_channel?(channel)
             logger.info "Event:\n" + event.pretty_inspect.each_line.map {|l| "> #{l}" }.join("")
-            logger.info "#{channel.slack_id}: #{message}"
+            logger.info "#{channel.slack_id}: #{text}"
 
             if thread_ts && thread_context_prohibited?(channel)
               response = "Sorry, we can't continue the conversation within threads on this channel! Please mention me outside threads."
@@ -131,8 +131,10 @@ module SlackBot
                 ]
               )
             else
-              case message
+              case text
               when /^<@#{bot_id}>\s+/
+                Message.create!(conversation: channel, user: user, text: text, slack_ts: ts, slack_thread_ts: thread_ts || ts)
+
                 message_body = Regexp.last_match.post_match
                 job_params = {
                   "channel" => channel.slack_id,
