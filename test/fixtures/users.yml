@@ -1,15 +1,17 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
 one:
-  slack_id: MyString
-  name: MyString
-  real_name: MyString
-  email: MyString
-  tz_offset: 1
+  slack_id: ULNPC5Z1R
+  name: one
+  real_name: One One
+  email: one@example.com
+  tz_offset: 32400
+  locale: ja-JP
 
 two:
-  slack_id: MyString
-  name: MyString
-  real_name: MyString
-  email: MyString
-  tz_offset: 1
+  slack_id: UDM9UPZ5G
+  name: two
+  real_name: Two Two
+  email: two@example.com
+  tz_offset: 32400
+  locale: en-US

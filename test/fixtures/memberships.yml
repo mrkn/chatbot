@@ -1,9 +1,13 @@
 # Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
 
-one:
-  conversation: one
+one_random:
+  conversation: random
   user: one
 
-two:
-  conversation: two
+one_general:
+  conversation: general
+  user: one
+
+two_general:
+  conversation: general
   user: two
