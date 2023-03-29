@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  conversation: one
+  user: one
+  text: MyString
+  slack_ts: MyString
+  slack_thread_ts: MyString
+
+two:
+  conversation: two
+  user: two
+  text: MyString
+  slack_ts: MyString
+  slack_thread_ts: MyString
