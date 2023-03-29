@@ -90,6 +90,108 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
     )
   end
 
+
+  test "app_mention event from unknown user in unknown channel" do
+    channel_id = "CUQF0FE2V"
+    user_id = "U039NG1FNJE"
+    query_body = "ZZZ"
+    query = "<@TEST_BOT_ID> #{query_body}"
+    answer = "ABC"
+    expected_response = "<@#{user_id}> #{answer}"
+
+    stub(Utils).chat_completion({
+      role: "user",
+      content: [
+        "You are ChatGPT, a large language model trained by OpenAI.",
+        "Answer as concisely as possible.",
+        "Current date: #{Time.now.strftime("%Y-%m-%d")}",
+        "\n",
+        "ZZZ"
+      ].join("\n")
+    }) do
+      {
+        "model" => "gpt-3.5-turbo-0301",
+        "usage" => {
+          "prompt_tokens" => 70,
+          "completion_tokens" => 50,
+          "total_tokens" => 120
+        },
+        "choices" => [{"message" => {"content" => answer}}]
+      }
+    end
+
+    stub_request(:post, "https://slack.com/api/users.info")
+      .with(body: {"user" => user_id, "include_locale" => true},
+            headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+      .to_return(
+        body: {
+          "ok" => true,
+          "user" => {
+            "id" => user_id,
+            "name" => "mrkn",
+            "real_name" => "Kenta Murata",
+            "tz_offset" => 3600,
+            "profile" => {
+              "email" => "mrkn@example.com"
+            },
+            "locale" => "en-UK"
+          }
+        }.to_json
+      )
+
+    stub_request(:post, "https://slack.com/api/conversations.info")
+      .with(body: "channel=#{channel_id}",
+            headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+      .to_return(
+        body: {
+          "ok" => true,
+          "channel" => {
+            "id" => channel_id,
+            "name" => "unknown-channel",
+          }
+        }.to_json
+      )
+
+    assert User.find_by_slack_id(user_id).blank?
+    assert Conversation.find_by_slack_id(channel_id).blank?
+
+    assert_enqueued_with(job: ChatCompletionJob) do
+      timestamp = Time.now.to_i
+      params = {
+        type: "event_callback",
+        event: {
+          type: "app_mention",
+          text: query,
+          channel: channel_id,
+          user: user_id
+        }
+      }
+      request_body = ActionDispatch::RequestEncoder.encoder(:json).encode_params(params)
+      headers = {
+        "X-Slack-Request-Timestamp": timestamp,
+        "X-Slack-Signature": compute_request_signature(timestamp, request_body)
+      }
+
+      post "/slack/events", params:, headers:, as: :json
+    end
+
+    new_user = User.find_by_slack_id(user_id)
+    assert_equal(["mrkn", "Kenta Murata", "mrkn@example.com", 3600, "en-UK"],
+                 [
+                   new_user.name,
+                   new_user.real_name,
+                   new_user.email,
+                   new_user.tz_offset,
+                   new_user.locale
+                 ])
+
+    new_channel = Conversation.find_by_slack_id(channel_id)
+    assert_equal("unknown-channel", new_channel.name)
+
+    assert new_channel.members.include?(new_user)
+  end
+
+
   test "app_mention event with invalid signature" do
     channel_id = conversations(:random).slack_id
     user_id = users(:one).slack_id
@@ -115,6 +217,7 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
     assert_response :bad_request
   end
+
 
   test "app_mention event when SLACK_SIGNING_SECRET is not given" do
     channel_id = conversations(:random).slack_id

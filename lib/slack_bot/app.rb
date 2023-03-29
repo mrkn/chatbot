@@ -32,7 +32,7 @@ module SlackBot
       if ALLOW_CHANNEL_IDS.empty?
         true
       else
-        ALLOW_CHANNEL_IDS.include?(channel)
+        ALLOW_CHANNEL_IDS.include?(channel.slack_id)
       end
     end
 
@@ -103,21 +103,21 @@ module SlackBot
 
         if event["type"] == "app_mention"
           team = event["team"]
-          channel = event["channel"]
-          user = event["user"]
+          channel = ensure_conversation(event["channel"])
+          user = ensure_user(event["user"], channel)
           ts = event["ts"]
           thread_ts = event["thread_ts"]
           message = event["text"]
 
           if allowed_channel?(channel)
             logger.info "Event:\n" + event.pretty_inspect.each_line.map {|l| "> #{l}" }.join("")
-            logger.info "#{channel}: #{message}"
+            logger.info "#{channel.slack_id}: #{message}"
 
             if thread_ts && thread_context_prohibited?(channel)
               response = "Sorry, we can't continue the conversation within threads on this channel! Please mention me outside threads."
               Utils.post_ephemeral(
-                channel: channel,
-                user: user,
+                channel: channel.slack_id,
+                user: user.slack_id,
                 thread_ts: ts,
                 text: response,
                 blocks: [
@@ -135,8 +135,8 @@ module SlackBot
               when /^<@#{bot_id}>\s+/
                 message_body = Regexp.last_match.post_match
                 job_params = {
-                  "channel" => channel,
-                  "user" => user,
+                  "channel" => channel.slack_id,
+                  "user" => user.slack_id,
                   "ts" => ts,
                   "message" => message_body,
                 }
@@ -148,6 +148,54 @@ module SlackBot
         end
 
         status 200
+      end
+    end
+
+    private def ensure_user(user_id, channel)
+      user = User.find_by_slack_id(user_id)
+      user = fetch_user!(user_id) if user.blank?
+      unless channel.members.include?(user)
+        channel.members << user
+      end
+      user
+    end
+
+    private def ensure_conversation(channel_id)
+      channel = Conversation.find_by_slack_id(channel_id)
+      if channel.present?
+        channel
+      else
+        fetch_conversation!(channel_id)
+      end
+    end
+
+    private def fetch_user!(user_id)
+      slack_client = Slack::Web::Client.new
+      response = slack_client.users_info(user: user_id, include_locale: true)
+      if response.ok
+        User.create!(
+          name: response.user.name,
+          real_name: response.user.real_name,
+          slack_id: response.user.id,
+          locale: response.user.locale,
+          email: response.user.profile.email,
+          tz_offset: response.user.tz_offset.to_i
+        )
+      else
+        raise "users.info with user=#{user_id} is failed"
+      end
+    end
+
+    private def fetch_conversation!(channel_id)
+      slack_client = Slack::Web::Client.new
+      response = slack_client.conversations_info(channel: channel_id)
+      if response.ok
+        Conversation.create!(
+          name: response.channel.name,
+          slack_id: response.channel.id
+        )
+      else
+        raise "conversations.info with channel=#{channel_id} is failed"
       end
     end
   end
