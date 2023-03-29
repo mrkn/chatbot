@@ -5,9 +5,9 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
   include SlackTestHelper
 
-  test "app_mention event" do
-    channel_id = "XXX"
-    user_id = "YYY"
+  test "app_mention event from known user in known channel" do
+    channel_id = conversations(:random).slack_id
+    user_id = users(:one).slack_id
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
     answer = "ABC"
@@ -91,8 +91,8 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
   end
 
   test "app_mention event with invalid signature" do
-    channel_id = "XXX"
-    user_id = "YYY"
+    channel_id = conversations(:random).slack_id
+    user_id = users(:one).slack_id
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
 
@@ -117,8 +117,8 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
   end
 
   test "app_mention event when SLACK_SIGNING_SECRET is not given" do
-    channel_id = "XXX"
-    user_id = "YYY"
+    channel_id = conversations(:random).slack_id
+    user_id = users(:one).slack_id
     query_body = "ZZZ"
     query = "<@TEST_BOT_ID> #{query_body}"
 

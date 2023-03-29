@@ -4,8 +4,8 @@ class ChatCompletionJobTest < ActiveJob::TestCase
   include SlackTestHelper
 
   test "normal case" do
-    channel_id = "XXX"
-    user_id = "YYY"
+    channel_id = conversations(:random).slack_id
+    user_id = users(:one).slack_id
     query = "ZZZ"
     answer = "ABC"
     expected_response = "<@#{user_id}> #{answer}"
