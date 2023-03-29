@@ -271,4 +271,14 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
     assert_response :internal_server_error
   end
+
+
+  test "app_mention event in channel where not allowed" do
+    skip "TODO"
+  end
+
+
+  test "app_mention event with thread_ts in channel where thread conversation is not allowed" do
+    skip "TODO"
+  end
 end
