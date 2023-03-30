@@ -1,13 +1,21 @@
 module Utils
   module_function def chat_completion(*messages, model: nil, temperature: nil)
-    client = OpenAI::Client.new
-    client.chat(
+    body = {
       parameters: {
         model: model || "gpt-3.5-turbo",
         messages: messages,
         temperature: temperature || 0.7
       }
+    }
+
+    client = OpenAI::Client.new
+    response = client.chat(params)
+
+    Response.create!(
+      query: query,
     )
+
+    response
   end
 
   module_function def post_message(channel:, text:, **params)

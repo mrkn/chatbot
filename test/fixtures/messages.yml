@@ -3,7 +3,7 @@
 one:
   conversation: random
   user: one
-  text: MyString
+  text: ZZZ
   slack_ts: 1680132278.1370368
   slack_thread_ts: 1680132278.1370368
 

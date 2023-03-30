@@ -133,17 +133,15 @@ module SlackBot
             else
               case text
               when /^<@#{bot_id}>\s+/
-                Message.create!(conversation: channel, user: user, text: text, slack_ts: ts, slack_thread_ts: thread_ts || ts)
-
                 message_body = Regexp.last_match.post_match
-                job_params = {
-                  "channel" => channel.slack_id,
-                  "user" => user.slack_id,
-                  "ts" => ts,
-                  "message" => message_body,
-                }
-                params["thread_ts"] = thread_ts if thread_ts
-                ChatCompletionJob.perform_later(job_params)
+                message = Message.create!(
+                  conversation: channel,
+                  user: user,
+                  text: message_body,
+                  slack_ts: ts,
+                  slack_thread_ts: thread_ts || ts
+                )
+                ChatCompletionJob.perform_later("message_id" => message.id)
               end
             end
           end

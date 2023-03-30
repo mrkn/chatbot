@@ -14,26 +14,34 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
     answer = "ABC"
     expected_response = "<@#{user.slack_id}> #{answer}"
 
-    stub(Utils).chat_completion({
-      role: "user",
-      content: [
-        "You are ChatGPT, a large language model trained by OpenAI.",
-        "Answer as concisely as possible.",
-        "Current date: #{Time.now.strftime("%Y-%m-%d")}",
-        "\n",
-        "ZZZ"
-      ].join("\n")
-    }) do
+    chat_completion_messages = [
       {
-        "model" => "gpt-3.5-turbo-0301",
-        "usage" => {
-          "prompt_tokens" => 70,
-          "completion_tokens" => 50,
-          "total_tokens" => 120
-        },
-        "choices" => [{"message" => {"content" => answer}}]
+        role: "user",
+        content: [
+          "You are ChatGPT, a large language model trained by OpenAI.",
+          "Answer as concisely as possible.",
+          "Current date: #{Time.now.strftime("%Y-%m-%d")}",
+          "\n",
+          "ZZZ"
+        ].join("\n")
       }
-    end
+    ]
+
+    chat_completion_response = {
+      "model" => "gpt-3.5-turbo-0301",
+      "usage" => {
+        "prompt_tokens" => 70,
+        "completion_tokens" => 50,
+        "total_tokens" => 120
+      },
+      "choices" => [{"message" => {"content" => answer}}]
+    }
+
+    stub(Utils).chat_completion(
+      *chat_completion_messages,
+      model: "gpt-3.5-turbo",
+      temperature: 0.7
+    ) { chat_completion_response }
 
     stub_request(:post, "https://slack.com/api/chat.postMessage")
 
@@ -62,7 +70,7 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
 
     message = Message.find_by!(conversation: channel, user: user, slack_ts: slack_ts)
     assert_equal([
-                   query,
+                   query_body,
                    slack_ts,
                  ],
                  [
@@ -83,6 +91,9 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
     ) do |request|
       actual_body = decode_slack_client_request_body(request.body)
     end
+
+    query = Query.find_by!(message: message)
+    response = Response.find_by!(query: query)
 
     assert_equal(
       {

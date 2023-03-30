@@ -4,24 +4,28 @@ class ChatCompletionJobTest < ActiveJob::TestCase
   include SlackTestHelper
 
   test "normal case" do
-    channel_id = conversations(:random).slack_id
-    user_id = users(:one).slack_id
-    query = "ZZZ"
+    message = messages(:one)
+    channel = message.conversation
+    user = message.user
     answer = "ABC"
-    expected_response = "<@#{user_id}> #{answer}"
+    expected_response = "<@#{user.slack_id}> #{answer}"
 
     stub_request(:post, "https://slack.com/api/chat.postMessage")
 
-    mock(Utils).chat_completion({
-      role: "user",
-      content: [
-        "You are ChatGPT, a large language model trained by OpenAI.",
-        "Answer as concisely as possible.",
-        "Current date: #{Time.now.strftime("%Y-%m-%d")}",
-        "\n",
-        query
-      ].join("\n")
-    }) do
+    mock(Utils).chat_completion(
+      {
+        role: "user",
+        content: [
+          "You are ChatGPT, a large language model trained by OpenAI.",
+          "Answer as concisely as possible.",
+          "Current date: #{Time.now.strftime("%Y-%m-%d")}",
+          "\n",
+          message.text
+        ].join("\n")
+      },
+      model: "gpt-3.5-turbo",
+      temperature: 0.7
+    ) do
       {
         "model" => "gpt-3.5-turbo-0301",
         "usage" => {
@@ -37,11 +41,7 @@ class ChatCompletionJobTest < ActiveJob::TestCase
       }
     end
 
-    ChatCompletionJob.perform_now({
-      "channel" => channel_id,
-      "user" => user_id,
-      "message" => query
-    })
+    ChatCompletionJob.perform_now("message_id" => message.id)
 
     actual_body = nil
     assert_requested(
@@ -55,7 +55,7 @@ class ChatCompletionJobTest < ActiveJob::TestCase
 
     assert_equal(
       {
-        "channel" => channel_id,
+        "channel" => channel.slack_id,
         "text" => expected_response,
         "blocks" => [
           {
@@ -67,7 +67,8 @@ class ChatCompletionJobTest < ActiveJob::TestCase
           },
           api_usage_block(70, 50, "gpt-3.5-turbo-0301"),
           feedback_action_block
-        ]
+        ],
+        "thread_ts" => message.slack_thread_ts
       },
       actual_body
     )
