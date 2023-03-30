@@ -10,6 +10,9 @@ class ChatCompletionJob < ApplicationJob
   Current date: {current_date}
   END_PROMPT
 
+  DEFAULT_REACTION_SYMBOL = "hourglass_flowing_sand".freeze
+  REACTION_SYMBOL = ENV.fetch("SLACK_REACTION_SYMBOL", DEFAULT_REACTION_SYMBOL)
+
   def perform(params)
     if params["message_id"].blank?
       logger.warn "Empty message_id is given"
@@ -115,14 +118,14 @@ class ChatCompletionJob < ApplicationJob
     [{role: "user", content: content.strip}]
   end
 
-  private def start_query(message, name="hourglass_flowing_sand")
+  private def start_query(message, name=REACTION_SYMBOL)
     client = Slack::Web::Client.new
     client.reactions_add(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
   rescue
     nil
   end
 
-  private def finish_query(message, name="hourglass_flowing_sand")
+  private def finish_query(message, name=REACTION_SYMBOL)
     client = Slack::Web::Client.new
     client.reactions_remove(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
   rescue
