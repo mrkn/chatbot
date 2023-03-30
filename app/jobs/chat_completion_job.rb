@@ -11,7 +11,16 @@ class ChatCompletionJob < ApplicationJob
   END_PROMPT
 
   def perform(params)
+    if params["message_id"].blank?
+      logger.warn "Empty message_id is given"
+      return
+    end
+
     message = Message.find(params["message_id"])
+    if message.blank?
+      logger.warn "Unable to find Message with id=#{message_id}"
+      return
+    end
 
     # TODO: construct the prompt when the first query in a conversation
     #
