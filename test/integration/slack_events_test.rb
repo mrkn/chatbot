@@ -43,7 +43,7 @@ class SlackEventsTest < ActionDispatch::IntegrationTest
       temperature: 0.7
     ) { chat_completion_response }
 
-    stub_slack_api(:post, "chat.postMessage")
+    stub_slack_api(:post, "chat.postMessage").to_return(body: { "ok" => true, "ts" => Time.now.to_f.to_s }.to_json)
 
     # Check the case when missing reactions:write scope
     stub_slack_api(:post, "reactions.add").to_return { raise Slack::Web::Api::Errors::MissingScope, "missing_scope" }

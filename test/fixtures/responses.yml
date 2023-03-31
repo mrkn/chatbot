@@ -6,12 +6,16 @@ two:
   n_query_tokens: 1
   n_response_tokens: 1
   body: {}
-  good: false
+  good: null
+  slack_ts: 1680248817.7917693
+  slack_thread_ts: 1680132294.789146
 
 three:
   query: three
-  text: MyString
+  text: "<@ULNPC5Z1R> Response Message"
   n_query_tokens: 1
   n_response_tokens: 1
   body: {}
-  good: false
+  good: null
+  slack_ts: 1680248834.3445895
+  slack_thread_ts: 1680142578.5190222

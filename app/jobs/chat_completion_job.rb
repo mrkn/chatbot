@@ -12,6 +12,7 @@ class ChatCompletionJob < ApplicationJob
 
   DEFAULT_REACTION_SYMBOL = "hourglass_flowing_sand".freeze
   REACTION_SYMBOL = ENV.fetch("SLACK_REACTION_SYMBOL", DEFAULT_REACTION_SYMBOL)
+  ERROR_REACTION_SYMBOL = "bangbang".freeze
 
   def perform(params)
     if params["message_id"].blank?
@@ -79,13 +80,9 @@ class ChatCompletionJob < ApplicationJob
       text: chat_response.dig("choices", 0, "message", "content").strip,
       n_query_tokens: chat_response.dig("usage", "prompt_tokens"),
       n_response_tokens: chat_response.dig("usage", "completion_tokens"),
-      body: chat_response.to_json
+      body: chat_response.to_json,
+      slack_thread_ts: message.slack_thread_ts
     )
-
-    Query.transaction do
-      query.save!
-      response.save!
-    end
 
     # TODO: make the following response creation into Response's instance method
 
@@ -103,9 +100,22 @@ class ChatCompletionJob < ApplicationJob
       thread_ts: message.slack_thread_ts,
       **post_params
     )
-    logger.info posted_message.inspect
 
-    finish_query(message)
+    if posted_message.ok
+      logger.info posted_message.inspect
+
+      response.slack_ts = posted_message.ts
+      response.slack_thread_ts = message.slack_thread_ts
+
+      Query.transaction do
+        query.save!
+        response.save!
+      end
+
+      finish_query(message)
+    else
+      error_query(message)
+    end
   end
 
   private def make_first_messages(prompt, query_body, model: "gpt-3.5-turbo")
@@ -126,6 +136,13 @@ class ChatCompletionJob < ApplicationJob
   end
 
   private def finish_query(message, name=REACTION_SYMBOL)
+    client = Slack::Web::Client.new
+    client.reactions_remove(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
+  rescue
+    nil
+  end
+
+  private def error_query(message, name=ERROR_REACTION_SYMBOL)
     client = Slack::Web::Client.new
     client.reactions_remove(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
   rescue

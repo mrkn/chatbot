@@ -39,7 +39,7 @@ class ChatCompletionJobTest < ActiveJob::TestCase
       }
     end
 
-    stub_slack_api(:post, "chat.postMessage")
+    stub_slack_api(:post, "chat.postMessage").to_return(body: {ok: true, ts: Time.now.to_f.to_s}.to_json)
     stub_slack_api(:post, "reactions.add")
     stub_slack_api(:post, "reactions.remove")
 

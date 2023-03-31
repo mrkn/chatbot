@@ -41,7 +41,16 @@ module SlackBot
     end
 
     before "/events" do
-      Slack::Events::Request.new(request).verify!
+      verify_slack_request!
+    end
+
+    before "/interactions" do
+      verify_slack_request!
+    end
+
+    private def verify_slack_request!
+      slack_request = Slack::Events::Request.new(request)
+      slack_request.verify!
     end
 
     error Slack::Events::Request::MissingSigningSecret do
@@ -149,6 +158,116 @@ module SlackBot
 
         status 200
       end
+    end
+
+    post "/interactions" do
+      payload = JSON.parse(params["payload"])
+      case payload["type"]
+      when "block_actions"
+        # {"type"=>"block_actions",
+        #  "user"=>
+        #   {"id"=>"U02M703H8UD",
+        #    "username"=>"mrkn832",
+        #    "name"=>"mrkn832",
+        #    "team_id"=>"T036WLG7F"},
+        #  "api_app_id"=>"A04UXJQGE8G",
+        #  "token"=>"ois0a7oRraM5473ru1fMXzYL",
+        #  "container"=>
+        #   {"type"=>"message",
+        #    "message_ts"=>"1680167961.051859",
+        #    "channel_id"=>"C036WLG7Z",
+        #    "is_ephemeral"=>false,
+        #    "thread_ts"=>"1680167953.226819"},
+        #  "trigger_id"=>"5036827519765.3234696253.771f51c31efbc827286c0a43befd4251",
+        #  "team"=>{"id"=>"T036WLG7F", "domain"=>"mrkn"},
+        #  "enterprise"=>nil,
+        #  "is_enterprise_install"=>false,
+        #  "channel"=>{"id"=>"C036WLG7Z", "name"=>"random"},
+        #  "message"=>
+        #   {"bot_id"=>"B04UXK8GLG0",
+        #    "type"=>"message",
+        #    "text"=>"<@U036WLG7H> 苺大福の発祥地は日本であり、正確な起源は不明ですが、江戸時代にはすでに存在していたとされています。",
+        #    "user"=>"U04U7QNHCD9",
+        #    "ts"=>"1680167961.051859",
+        #    "app_id"=>"A04UXJQGE8G",
+        #    "blocks"=>
+        #     [{"type"=>"section",
+        #       "block_id"=>"pv1td",
+        #       "text"=>
+        #        {"type"=>"mrkdwn",
+        #         "text"=>
+        #          "<@U036WLG7H> 苺大福の発祥地は日本であり、正確な起源は不明ですが、江戸時代にはすでに存在していたとされています。",
+        #         "verbatim"=>false}},
+        #      {"type"=>"context",
+        #       "block_id"=>"E6OL",
+        #       "elements"=>
+        #        [{"type"=>"mrkdwn",
+        #          "text"=>
+        #           "API Usage: total 102 tokens ≈ ¥0.03 (prompt + completion = 54 + 48 tokens ≈ ¥0.02 + ¥0.01)",
+        #          "verbatim"=>false}]},
+        #      {"type"=>"actions",
+        #       "block_id"=>"t53",
+        #       "elements"=>
+        #        [{"type"=>"button",
+        #          "action_id"=>"gF=p",
+        #          "text"=>{"type"=>"plain_text", "text"=>"Good", "emoji"=>true},
+        #          "style"=>"primary",
+        #          "value"=>"good"},
+        #         {"type"=>"button",
+        #          "action_id"=>"/ba",
+        #          "text"=>{"type"=>"plain_text", "text"=>"Bad", "emoji"=>true},
+        #          "style"=>"danger",
+        #          "value"=>"bad"}]}],
+        #    "team"=>"T036WLG7F",
+        #    "thread_ts"=>"1680167953.226819",
+        #    "parent_user_id"=>"U036WLG7H"},
+        #  "state"=>{"values"=>{}},
+        #  "response_url"=>
+        #   "https://hooks.slack.com/actions/T036WLG7F/5063466698576/KHj1F2n100Ouy1pf7leGRqdW",
+        #  "actions"=>
+        #   [{"action_id"=>"gF=p",
+        #     "block_id"=>"t53",
+        #     "text"=>{"type"=>"plain_text", "text"=>"Good", "emoji"=>true},
+        #     "value"=>"good",
+        #     "style"=>"primary",
+        #     "type"=>"button",
+        #     "action_ts"=>"1680230940.375437"}]}
+
+        feedback_value = payload.dig("actions", 0, "value")
+        response = Response.find_by!(slack_ts: payload["message"]["ts"])
+
+        Response.transaction do
+          Faraday.post(payload["response_url"]) do |request|
+            request.headers = {
+              "Content-Type" => "application/json"
+            }
+            body = {
+              "text" => payload.dig("message", "text"),
+              "blocks" => payload.dig("message", "blocks"),
+            }
+            feedback_block = body["blocks"][-1]
+            if feedback_block["type"] != "context"
+              feedback_block = {}
+              body["blocks"] << feedback_block
+            end
+            feedback_block.update({
+              "type" => "context",
+              "elements" => [
+                {
+                  "type" => "mrkdwn",
+                  "text" => "#{feedback_value.capitalize} feedback received."
+                }
+              ]
+            })
+            request.body = body.to_json
+          end
+
+          response.good = (feedback_value == "good")
+          response.save!
+        end
+      end
+
+      status 200
     end
 
     private def ensure_user(user_id, channel)
