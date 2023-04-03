@@ -75,47 +75,67 @@ class ChatCompletionJob < ApplicationJob
     #     "finish_reason"=>"stop",
     #     "index"=>0}]}
 
-    response = Response.new(
-      query: query,
-      text: chat_response.dig("choices", 0, "message", "content").strip,
-      n_query_tokens: chat_response.dig("usage", "prompt_tokens"),
-      n_response_tokens: chat_response.dig("usage", "completion_tokens"),
-      body: chat_response.to_json,
-      slack_thread_ts: message.slack_thread_ts
-    )
+    # Error case:
+    #
+    # {"error"=>
+    #   {"message"=>
+    #     "You exceeded your current quota, please check your plan and billing details.",
+    #    "type"=>"insufficient_quota",
+    #    "param"=>nil,
+    #    "code"=>nil}}
 
-    # TODO: make the following response creation into Response's instance method
-
-    model = chat_response["model"]
-    answer = "<@#{message.user.slack_id}> #{response.text}"
-    post_params = SlackBot.format_chat_gpt_response(
-      answer,
-      prompt_tokens: response.n_query_tokens,
-      completion_tokens: response.n_response_tokens,
-      model: model
-    )
-
-    posted_message = Utils.post_message(
-      channel: message.conversation.slack_id,
-      thread_ts: message.slack_thread_ts,
-      **post_params
-    )
-
-    if posted_message.ok
-      logger.info posted_message.inspect
-
-      response.slack_ts = posted_message.ts
-      response.slack_thread_ts = message.slack_thread_ts
-
-      Query.transaction do
-        query.save!
-        response.save!
-      end
-
-      finish_query(message)
-    else
+    if chat_response.key? "error"
+      error_type, error_message = chat_response["error"].values_at("type", "message")
+      Utils.post_message(
+        channel: message.conversation.slack_id,
+        thread_ts: message.slack_thread_ts,
+        text: ":#{ERROR_REACTION_SYMBOL}: *ERROR*: #{error_type}: #{error_message}",
+        mrkdwn: true
+      )
       error_query(message)
+    else
+      response = Response.new(
+        query: query,
+        text: chat_response.dig("choices", 0, "message", "content").strip,
+        n_query_tokens: chat_response.dig("usage", "prompt_tokens"),
+        n_response_tokens: chat_response.dig("usage", "completion_tokens"),
+        body: chat_response.to_json,
+        slack_thread_ts: message.slack_thread_ts
+      )
+
+      # TODO: make the following response creation into Response's instance method
+
+      model = chat_response["model"]
+      answer = "<@#{message.user.slack_id}> #{response.text}"
+      post_params = SlackBot.format_chat_gpt_response(
+        answer,
+        prompt_tokens: response.n_query_tokens,
+        completion_tokens: response.n_response_tokens,
+        model: model
+      )
+
+      posted_message = Utils.post_message(
+        channel: message.conversation.slack_id,
+        thread_ts: message.slack_thread_ts,
+        **post_params
+      )
+
+      if posted_message.ok
+        logger.info posted_message.inspect
+
+        response.slack_ts = posted_message.ts
+        response.slack_thread_ts = message.slack_thread_ts
+
+        Query.transaction do
+          query.save!
+          response.save!
+        end
+      else
+        error_query(message)
+      end
     end
+
+    finish_query(message)
   end
 
   private def make_first_messages(prompt, query_body, model: "gpt-3.5-turbo")
@@ -144,7 +164,7 @@ class ChatCompletionJob < ApplicationJob
 
   private def error_query(message, name=ERROR_REACTION_SYMBOL)
     client = Slack::Web::Client.new
-    client.reactions_remove(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
+    client.reactions_add(channel: message.conversation.slack_id, timestamp: message.slack_ts, name:)
   rescue
     nil
   end
